@@ -4,13 +4,15 @@
 # DES implementation in Python
 # Author: Ensar Gök
 # License: Apache 2.0
+# Medium: https://medium.com/@ensargok/des-fedc78d21045
 
 import numpy as np
 from typing import Literal
+import argparse
 
 class DES:
-    def __init__(self):
-        self.initial_key = self.generate_key()
+    def __init__(self, key_str: str = "byEnsarGok"):
+        self.initial_key = self.generate_key(key_str)
         self.key = self.generate_subkeys()
 
         # Expansion table
@@ -33,37 +35,55 @@ class DES:
             19, 13, 30, 6, 22, 11, 4, 25
         ]
 
-    def encrypt(self, plaintext: str, __format: Literal['hex', 'bin'] = 'hex'):
+    def encrypt(self, plaintext: str, out_format: Literal['hex', 'bin'] = 'hex'):
         # convert the data to binary
         plaintext = ''.join(format(ord(i), '08b') for i in plaintext)
 
         # convert the data to a list of integers
         plaintext = [int(i) for i in plaintext]
 
+        # Split the plaintext into 64-bit blocks
+        data_list = []
+        for i in range(0, len(plaintext), 64):
+            if len(plaintext[i:i + 64]) < 64:
+                plaintext += [0] * (64 - len(plaintext[i:i + 64]))
+            data_list.append(plaintext[i:i + 64])
+
         # Encrypt the plaintext using the key
-        data = self._des(plaintext)
+        data = []
+        for block in data_list:
+            data += self._des(block)
 
         # convert the data to hex
-        if __format == 'hex':
+        if out_format == 'hex':
             # Convert binary to bytes objext
             data = ''.join(str(bit) for bit in data)
             data = int(data, 2).to_bytes((len(data) + 7) // 8, byteorder='big')
-        elif __format == 'bin':
+            data = '0x' + ''.join([format(byte, '02x') for byte in data])
+        elif out_format == 'bin':
             data = ''.join(map(str, data))
         return data
 
-    def decrypt(self, ciphertext, __format: Literal['hex', 'bin'] = 'hex'):
+    def decrypt(self, ciphertext, out_format: Literal['hex', 'bin'] = 'hex'):
         # convert the data to binary
-        if __format == 'hex':
+        if out_format == 'hex':
+            ciphertext = int(ciphertext, 16).to_bytes((len(ciphertext) - 2) // 2, byteorder='big')
             ciphertext = ''.join(format(i, '08b') for i in ciphertext)
-        elif __format == 'bin':
+        elif out_format == 'bin':
             ciphertext = ''.join(ciphertext)
 
         # convert the data to a list of integers
         ciphertext = [int(i) for i in ciphertext]
 
+        # Split the ciphertext into 64-bit blocks
+        data_list = []
+        for i in range(0, len(ciphertext), 64):
+            data_list.append(ciphertext[i:i + 64])
+
         # Decrypt the ciphertext using the key
-        data = self._des(ciphertext, encrypt=False)
+        data = []
+        for block in data_list:
+            data += self._des(block, encrypt=False)
 
         # convert the data to a string
         data = ''.join([chr(int(''.join(map(str, data[i:i + 8])), 2)) for i in range(0, len(data), 8)])
@@ -227,7 +247,16 @@ class DES:
         # Left shift the data by 1
         return data[1:] + [data[0]]
 
-    def generate_key(self):
+    def generate_key(self, key: str):
+        # Compute hash value for key generation
+        hash_value = 0
+        for i in key:
+            hash_value = (hash_value * 31 + ord(i)) & 0xFFFFFFFFFFFFFFFF
+        hash_value = hash_value % 2**32
+
+        # Seed the random number generator
+        np.random.seed(hash_value)
+
         # Generate a random 64-bit key
         return np.random.randint(2, size=64)
 
@@ -269,9 +298,23 @@ class DES:
         return left + right
 
 
-des = DES()
-data = "HelloDES"
-data = des.encrypt(data)
-print(data)
-data = des.decrypt(data)
-print(data)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='DES encryption and decryption')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-e', '--encrypt', type=str, help='Plaintext to encrypt')
+    group.add_argument('-d', '--decrypt', type=str, help='Ciphertext to decrypt')
+    parser.add_argument('-k', '--key', type=str, help='Key for encryption and decryption. Default is "byEnsarGok"', default="byEnsarGok")
+    parser.add_argument('-f', '--format', type=str, help='Format of the input and output', default="hex", choices=['hex', 'bin'])
+
+    args = parser.parse_args()
+
+    des = DES(key_str=args.key)
+    if args.encrypt:
+        print(f"Plaintext: {args.encrypt}")
+        ciphertext = des.encrypt(args.encrypt, out_format=args.format)
+        print(f"Ciphertext: {ciphertext}")
+
+    if args.decrypt:
+        print(f"Ciphertext: {args.decrypt}")
+        plaintext = des.decrypt(args.decrypt, out_format=args.format)
+        print(f"Plaintext: {plaintext}")
