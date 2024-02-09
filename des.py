@@ -6,7 +6,6 @@
 # License: Apache 2.0
 # Medium: https://medium.com/@ensargok/des-fedc78d21045
 
-import numpy as np
 from typing import Literal
 import argparse
 
@@ -254,11 +253,14 @@ class DES:
             hash_value = (hash_value * 31 + ord(i)) & 0xFFFFFFFFFFFFFFFF
         hash_value = hash_value % 2**32
 
-        # Seed the random number generator
-        np.random.seed(hash_value)
+        # LCG for random number generation
+        def lcg():
+            nonlocal hash_value
+            hash_value = (1103515245 * hash_value + 12345) & 0x7fffffff
+            return hash_value
 
-        # Generate a random 64-bit key
-        return np.random.randint(2, size=64)
+        # Generate 64-bit key using LCG
+        return [(lcg() >> i) & 1 for i in range(64)]
 
     def generate_subkeys(self):
         # Generate 16 48-bit subkeys using the given 56-bit key
@@ -316,5 +318,9 @@ if __name__ == "__main__":
 
     if args.decrypt:
         print(f"Ciphertext: {args.decrypt}")
-        plaintext = des.decrypt(args.decrypt, out_format=args.format)
+        try:
+            plaintext = des.decrypt(args.decrypt, out_format=args.format)
+        except (IndexError, OverflowError, ValueError):
+            print("Invalid ciphertext")
+            exit(1)
         print(f"Plaintext: {plaintext}")
