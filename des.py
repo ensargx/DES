@@ -276,6 +276,11 @@ class DES:
             21, 13, 5, 28, 20, 12, 4
         ]
 
+        round_shifts = [
+            1, 1, 2, 2, 2, 2, 2, 2,
+            1, 2, 2, 2, 2, 2, 2, 1
+        ]
+
         # Permute the key using the PC1 table
         initial_key = self._permute(self.initial_key, PC1)
 
@@ -288,6 +293,11 @@ class DES:
             new_left = self._left_shift(left)
             new_right = self._left_shift(right)
 
+            # Perform the left shift
+            for _ in range(round_shifts[i] - 1):
+                new_left = self._left_shift(new_left)
+                new_right = self._left_shift(new_right)
+                
             # Combine the left and right parts
             combined = new_left + new_right
 
