@@ -265,15 +265,14 @@ class DES:
     def generate_subkeys(self):
         # Generate 16 48-bit subkeys using the given 56-bit key
         subkeys = []
-        for i in range(16):
-            # Left shift the key by 1 or 2
-            if i in [0, 1, 8, 15]:
-                self.initial_key = self._left_shift(self.initial_key)
-            else:
-                self.initial_key = self._left_shift(self._left_shift(self.initial_key))
+        initial_key = self.initial_key
 
-            # Permutation choice 2
-            subkey = self._permute(self.initial_key, [
+        for i in range(16):
+            # Left shift the key
+            initial_key = self._left_shift(initial_key)
+
+            # Permute the key using the compression table
+            subkey = self._permute(initial_key, [
                 14, 17, 11, 24, 1, 5, 3, 28,
                 15, 6, 21, 10, 23, 19, 12, 4,
                 26, 8, 16, 7, 27, 20, 13, 2,
