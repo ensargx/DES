@@ -26,7 +26,7 @@ Expected Ciphertext: 7A5BBCB84DAA24EE
 def main():
     des = DES()
 
-    key_bin = hex2binlist("0F1571C947D9E859")
+    key_bin = hex2binlist("133457799BBCDFF1")
 
     des.initial_key = key_bin
     des.key = des.generate_subkeys()

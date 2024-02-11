@@ -265,14 +265,34 @@ class DES:
     def generate_subkeys(self):
         # Generate 16 48-bit subkeys using the given 56-bit key
         subkeys = []
-        initial_key = self.initial_key
+        PC1 = [
+            57, 49, 41, 33, 25, 17, 9,
+            1, 58, 50, 42, 34, 26, 18,
+            10, 2, 59, 51, 43, 35, 27,
+            19, 11, 3, 60, 52, 44, 36,
+            63, 55, 47, 39, 31, 23, 15,
+            7, 62, 54, 46, 38, 30, 22,
+            14, 6, 61, 53, 45, 37, 29,
+            21, 13, 5, 28, 20, 12, 4
+        ]
 
+        # Permute the key using the PC1 table
+        initial_key = self._permute(self.initial_key, PC1)
+
+        # Split the key into left and right parts
+        left, right = initial_key[:28], initial_key[28:]
+
+        # Generate 16 subkeys
         for i in range(16):
-            # Left shift the key
-            initial_key = self._left_shift(initial_key)
+            # Left shift the left and right parts
+            new_left = self._left_shift(left)
+            new_right = self._left_shift(right)
 
-            # Permute the key using the compression table
-            subkey = self._permute(initial_key, [
+            # Combine the left and right parts
+            combined = new_left + new_right
+
+            # Permute the combined parts using the PC2 table
+            subkey = self._permute(combined, [
                 14, 17, 11, 24, 1, 5, 3, 28,
                 15, 6, 21, 10, 23, 19, 12, 4,
                 26, 8, 16, 7, 27, 20, 13, 2,
@@ -281,7 +301,12 @@ class DES:
                 34, 53, 46, 42, 50, 36, 29, 32
             ])
 
+            # Add the subkey to the list of subkeys
             subkeys.append(subkey)
+
+            # Update the left and right parts
+            left, right = new_left, new_right
+
         return subkeys
 
 
