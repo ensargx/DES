@@ -7,46 +7,131 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
+#include <string.h>
 
 #define LOG(...) printf(__VA_ARGS__)
 #define LOG_LINE() printf("Line %d reached.\n", __LINE__)
-#define LOG_BIN_64(x) \
-    for (int i = 0; i < 64; i++) \
-    { \
-        printf("%d", x >> 63 - i & 1); \
-    } \
-    printf("\n");
-#define LOG_BIN_32(x) \
-    for (int i = 0; i < 32; i++) \
-    { \
-        printf("%d", x >> 31 - i & 1); \
-    } \
-    printf("\n");
+#define LOG_BIN_64(x) for (int i = 0; i < 64; i++) { printf("%d", x >> 63 - i & 1); } printf("\n");
+#define LOG_BIN_32(x) {for (int i = 0; i < 32; i++) { printf("%d", x >> 31 - i & 1); } printf("\n")};
 
-int encrypt(char* input, char* key, char* output);
-int decrypt(char* input, char* key, char* output);
+int encrypt(char* input, char* key);
+int decrypt(char* input, char* key);
 int _des(uint64_t block, uint64_t key, uint64_t* result, int encrypt);
 
-int main(int argc, char** argv)
-{
-    uint64_t test_data = 0x1122334455667788;
-    uint64_t test_key = 0x752878397493CB70;
-    uint64_t result;
+int main(int argc, char *argv[]) {
+    int option;
+    char *encrypt_text = NULL;
+    char *decrypt_text = NULL;
+    char *key = "byEnsarGok";
+    char *format = "hex";
+    int encrypt_flag = 0;
+    int decrypt_flag = 0;
 
-    _des(test_data, test_key, &result, 1);
-    _des(result, test_key, &result, 0);
-    printf("Result: 0x%llx\n", result);
+    while ((option = getopt(argc, argv, "e:d:k:f:")) != -1) {
+        switch (option) {
+            case 'e':
+                encrypt_text = optarg;
+                encrypt_flag = 1;
+                break;
+            case 'd':
+                decrypt_text = optarg;
+                decrypt_flag = 1;
+                break;
+            case 'k':
+                key = optarg;
+                break;
+            case 'f':
+                if (strcmp(optarg, "hex") != 0 && strcmp(optarg, "bin") != 0) {
+                    fprintf(stderr, "Error: Format must be either 'hex' or 'bin'.\n");
+                    exit(EXIT_FAILURE);
+                }
+                format = optarg;
+                break;
+            default:
+                fprintf(stderr, "Usage: %s [-e plaintext] [-d ciphertext] [-k key] [-f format]\n", argv[0]);
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    if ((encrypt_flag && decrypt_flag) || (!encrypt_flag && !decrypt_flag)) {
+        fprintf(stderr, "Error: Must specify either encrypt or decrypt option, and they cannot be used together.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Encrypt text: %s\n", encrypt_text);
+    printf("Decrypt text: %s\n", decrypt_text);
+    printf("Key: %s\n", key);
+    printf("Format: %s\n", format);
+
+    if (encrypt_flag)
+    {
+        encrypt(encrypt_text, key);
+    }
+    else 
+    {
+        decrypt(decrypt_text, key);
+    }
+
 
     return 0;
 }
 
-int encrypt(char* input, char* key, char* output)
+int encrypt(char* input, char* key)
 {
+    uint64_t block = 0;
+    uint64_t key_block = 0;
+    uint64_t result = 0;
 
+    // Convert input to 64-bit block
+    for (int i = 0; i < 8; i++) {
+        block |= (uint64_t)input[i] << (56 - i * 8);
+    }
+
+    // Convert key to 64-bit block
+    for (int i = 0; i < 8; i++) {
+        key_block |= (uint64_t)key[i] << (56 - i * 8);
+    }
+
+    // Perform DES
+    _des(block, key_block, &result, 1);
+
+    // Print result
+    printf("Result: 0x");
+    for (int i = 0; i < 8; i++) {
+        printf("%x", (result >> (56 - i * 8)) & 0xFF);
+    }
+    printf("\n");
+
+    return 0;
 }
 
-int decrypt(char* input, char* key, char* output)
+int decrypt(char* input, char* key)
 {
+    uint64_t block = 0;
+    uint64_t key_block = 0;
+    uint64_t result = 0;
+
+    // Convert input to 64-bit block
+    for (int i = 0; i < 8; i++) {
+        block |= (uint64_t)input[i] << (56 - i * 8);
+    }
+
+    // Convert key to 64-bit block
+    for (int i = 0; i < 8; i++) {
+        key_block |= (uint64_t)key[i] << (56 - i * 8);
+    }
+
+    // Perform DES
+    _des(block, key_block, &result, 0);
+
+    // Print result
+    printf("Result: 0x");
+    for (int i = 0; i < 8; i++) {
+        printf("%x", (result >> (56 - i * 8)) & 0xFF);
+    }
+    printf("\n");
+
     return 0;
 }
 
