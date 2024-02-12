@@ -6,12 +6,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #define BLOCK_SIZE 64
 #define KEY_SIZE 64
 #define SUBKEY_SIZE 48
 #define ROUNDS 16
-#define ll unsigned long long int
 
 #define LOG(...) printf(__VA_ARGS__)
 #define LOG_LINE() printf("Line %d reached.\n", __LINE__)
@@ -20,28 +20,28 @@
 
 int encrypt(char* input, char* key, char* output);
 int decrypt(char* input, char* key, char* output);
-ll generate_key(char* key_str);
+uint64_t generate_key(char* key_str);
 
-int _des(ll block, ll key, ll* result, int encrypt);
+int _des(uint64_t block, uint64_t key, uint64_t* result, int encrypt);
 
 int main(int argc, char** argv)
 {
     char test_str[16] = "ensargok";
     // convert string to 64-
-    ll test_data;
+    uint64_t test_data;
     for (int i = 0; i < 16; i++)
     {
-        test_data |= (ll)test_str[i] << (8 * i);        
+        test_data |= (uint64_t)test_str[i] << (8 * i);        
     }
 
-    ll test_key = 0x133457799BBCDFF1;
-    ll result;
+    uint64_t test_key = 0x133457799BBCDFF1;
+    uint64_t result;
 
     _des(test_data, test_key, &result, 1);
-    printf("Encrypted: 0x%llx\n", result);
+    printf("Encrypted: 0x%llu\n", result);
 
-    _des(test_data, test_key, &result, 0);
-    printf("Decrypted: 0x%llx\n", result);
+    _des(result, test_key, &result, 0);
+    printf("Decrypted: 0x%llu\n", result);
 
     return 0;
 }
@@ -163,32 +163,32 @@ int P[] = {16, 7, 20, 21, 29, 12, 28, 17,
         2, 8, 24, 14, 32, 27, 3, 9,
         19, 13, 30, 6, 22, 11, 4, 25};
 
-void generate_subkeys(ll key, ll* subkeys[ROUNDS]);
+void generate_subkeys(uint64_t key, uint64_t* subkeys[ROUNDS]);
 
-int _des(ll block, ll key, ll* result, int encrypt)
+int _des(uint64_t block, uint64_t key, uint64_t* result, int encrypt)
 {
     // initial permutation
-    ll ip = 0;
+    uint64_t ip = 0;
     for (int i = 0; i < BLOCK_SIZE; i++)
     {
         ip |= ((block >> (BLOCK_SIZE - IP[i])) & 1) << (BLOCK_SIZE - i - 1);
     }
 
     // split into left and right
-    ll left = ip >> 32;
-    ll right = ip & 0xFFFFFFFF;
+    uint64_t left = ip >> 32;
+    uint64_t right = ip & 0xFFFFFFFF;
 
     // generate subkeys
-    ll subkeys[ROUNDS];
+    uint64_t subkeys[ROUNDS];
     generate_subkeys(key, &subkeys);
 
     // rounds
     for (int i = 0; i < ROUNDS; i++)
     {
-        ll subkey = encrypt ? subkeys[i] : subkeys[ROUNDS - i - 1];
+        uint64_t subkey = encrypt ? subkeys[i] : subkeys[ROUNDS - i - 1];
 
         // expansion permutation
-        ll expanded = 0;
+        uint64_t expanded = 0;
         for (int j = 0; j < SUBKEY_SIZE; j++)
         {
             expanded |= ((right >> (SUBKEY_SIZE - E[j])) & 1) << (SUBKEY_SIZE - j - 1);
@@ -199,7 +199,7 @@ int _des(ll block, ll key, ll* result, int encrypt)
         expanded ^= subkey;
 
         // S-boxes
-        ll sbox = 0;
+        uint64_t sbox = 0;
         for (int j = 0; j < 8; j++)
         {
             int row = ((expanded >> (6 * j)) & 1) | ((expanded >> (6 * j + 5) & 1)) << 1;
@@ -208,30 +208,30 @@ int _des(ll block, ll key, ll* result, int encrypt)
         }
 
         // P permutation
-        ll p = 0;
+        uint64_t p = 0;
         for (int j = 0; j < SUBKEY_SIZE; j++)
         {
             p |= ((sbox >> (SUBKEY_SIZE - P[j])) & 1) << (SUBKEY_SIZE - j - 1);
         }
 
         // xor with left
-        ll temp = right;
+        uint64_t temp = right;
         right = left ^ p;
         left = temp;
 
         if (i < ROUNDS - 1)
         {
-            ll temp = left;
+            uint64_t temp = left;
             left = right;
             right = temp;
         }
     }
 
     // combine left and right
-    ll combined = (right << 32) | left;
+    uint64_t combined = (right << 32) | left;
 
     // final permutation
-    ll fp = 0;
+    uint64_t fp = 0;
     for (int i = 0; i < BLOCK_SIZE; i++)
     {
         fp |= ((combined >> (BLOCK_SIZE - FP[i])) & 1) << (BLOCK_SIZE - i - 1);
@@ -241,18 +241,18 @@ int _des(ll block, ll key, ll* result, int encrypt)
     return 0;
 }
 
-void generate_subkeys(ll key, ll* subkeys[ROUNDS])
+void generate_subkeys(uint64_t key, uint64_t* subkeys[ROUNDS])
 {
     // PC1 permutation
-    ll pc1 = 0;
+    uint64_t pc1 = 0;
     for (int i = 0; i < KEY_SIZE; i++)
     {
         pc1 |= ((key >> (KEY_SIZE - PC1[i])) & 1) << (KEY_SIZE - i - 1);
     }
 
     // split into left and right
-    ll left = pc1 >> 28;
-    ll right = pc1 & 0xFFFFFFF;
+    uint64_t left = pc1 >> 28;
+    uint64_t right = pc1 & 0xFFFFFFF;
 
     for (int i = 0; i < ROUNDS; i++)
     {
@@ -261,8 +261,8 @@ void generate_subkeys(ll key, ll* subkeys[ROUNDS])
         right = ((right << 1) & 0xFFFFFFF) | ((right >> 27) & 1);
 
         // PC2 permutation
-        ll pc2 = 0;
-        ll combined = (left << 28) | right;
+        uint64_t pc2 = 0;
+        uint64_t combined = (left << 28) | right;
         for (int j = 0; j < SUBKEY_SIZE; j++)
         {
             pc2 |= ((combined >> (SUBKEY_SIZE - PC2[j])) & 1) << (SUBKEY_SIZE - j - 1);
@@ -274,16 +274,16 @@ void generate_subkeys(ll key, ll* subkeys[ROUNDS])
     return;    
 }
 
-ll llg(ll hash_value)
+uint64_t uint64_tg(uint64_t hash_value)
 {
     hash_value = (1103515245 * hash_value + 12345) & 0x7fffffff;
     hash_value = hash_value % POW32;
     return hash_value;
 }
 
-ll generate_key(char* key_str)
+uint64_t generate_key(char* key_str)
 {
-    ll hash_value = 0;
+    uint64_t hash_value = 0;
     for (int i = 0; i < KEY_SIZE; i++)
     {
         hash_value = (hash_value * 31 + key_str[i]) & 0xFFFFFFFFFFFFFFFF;
@@ -291,9 +291,9 @@ ll generate_key(char* key_str)
     hash_value = hash_value % POW32;
 
     // Generate 64-bit key using LCG
-    ll key = 0;
+    uint64_t key = 0;
     for (int i = 0; i < 64; i++)
     {
-        key |= (llg(hash_value) & 1) << i;
+        key |= (uint64_tg(hash_value) & 1) << i;
     }
 }
