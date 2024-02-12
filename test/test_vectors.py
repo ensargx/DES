@@ -32,6 +32,15 @@ def main():
     des.key = des.generate_subkeys()
     print(binlist2hex(des.key[0]))
 
+    key_bin = hex2binlist("752878397493CB70")
+    plaintext = hex2binlist("1122334455667788")
+    des.initial_key = key_bin
+    des.key = des.generate_subkeys()
+    cipher_bin = des._des(plaintext)
+    cipher_hex = binlist2hex(cipher_bin)
+    print(cipher_hex)
+
+
 
 def hex2binlist(hex_str):
     key_bin = bin(int(hex_str.removeprefix('0x'), 16))[2:]
