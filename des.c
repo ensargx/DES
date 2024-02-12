@@ -26,14 +26,7 @@ int _des(uint64_t block, uint64_t key, uint64_t* result, int encrypt);
 
 int main(int argc, char** argv)
 {
-    char test_str[16] = "ensargok";
-    // convert string to 64-
-    uint64_t test_data;
-    for (int i = 0; i < 16; i++)
-    {
-        test_data |= (uint64_t)test_str[i] << (8 * i);        
-    }
-
+    uint64_t test_data = 0x1122334455667788;
     uint64_t test_key = 0x133457799BBCDFF1;
     uint64_t result;
 
@@ -272,28 +265,4 @@ void generate_subkeys(uint64_t key, uint64_t* subkeys[ROUNDS])
     }
 
     return;    
-}
-
-uint64_t uint64_tg(uint64_t hash_value)
-{
-    hash_value = (1103515245 * hash_value + 12345) & 0x7fffffff;
-    hash_value = hash_value % POW32;
-    return hash_value;
-}
-
-uint64_t generate_key(char* key_str)
-{
-    uint64_t hash_value = 0;
-    for (int i = 0; i < KEY_SIZE; i++)
-    {
-        hash_value = (hash_value * 31 + key_str[i]) & 0xFFFFFFFFFFFFFFFF;
-    }
-    hash_value = hash_value % POW32;
-
-    // Generate 64-bit key using LCG
-    uint64_t key = 0;
-    for (int i = 0; i < 64; i++)
-    {
-        key |= (uint64_tg(hash_value) & 1) << i;
-    }
 }
