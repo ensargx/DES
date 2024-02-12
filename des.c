@@ -30,7 +30,7 @@ int _des(uint64_t block, uint64_t key, uint64_t* result, int encrypt);
 int main(int argc, char** argv)
 {
     uint64_t test_data = 0x1122334455667788;
-    uint64_t test_key = 0x133457799BBCDFF1;
+    uint64_t test_key = 0x752878397493CB70;
     uint64_t result;
 
     _des(test_data, test_key, &result, 1);
