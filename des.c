@@ -8,20 +8,17 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define BLOCK_SIZE 64
-#define KEY_SIZE 64
-#define SUBKEY_SIZE 48
-#define ROUNDS 16
-
 #define LOG(...) printf(__VA_ARGS__)
 #define LOG_LINE() printf("Line %d reached.\n", __LINE__)
-
-#define POW32 4294967296
+#define LOG_BIN(x) \
+    for (int i = 0; i < 64; i++) \
+    { \
+        printf("%d", x >> 63 - i & 1); \
+    } \
+    printf("\n");
 
 int encrypt(char* input, char* key, char* output);
 int decrypt(char* input, char* key, char* output);
-uint64_t generate_key(char* key_str);
-
 int _des(uint64_t block, uint64_t key, uint64_t* result, int encrypt);
 
 int main(int argc, char** argv)
@@ -31,10 +28,7 @@ int main(int argc, char** argv)
     uint64_t result;
 
     _des(test_data, test_key, &result, 1);
-    printf("Encrypted: 0x%llu\n", result);
-
-    _des(result, test_key, &result, 0);
-    printf("Decrypted: 0x%llu\n", result);
+    printf("Encrypted: 0x%llx\n", result);
 
     return 0;
 }
@@ -156,113 +150,24 @@ int P[] = {16, 7, 20, 21, 29, 12, 28, 17,
         2, 8, 24, 14, 32, 27, 3, 9,
         19, 13, 30, 6, 22, 11, 4, 25};
 
-void generate_subkeys(uint64_t key, uint64_t* subkeys[ROUNDS]);
-
 int _des(uint64_t block, uint64_t key, uint64_t* result, int encrypt)
 {
+    uint32_t L = 0;
+    uint32_t R = 0;
+    uint64_t IP_res = 0;
+    uint64_t FP_res = 0;
+
     // initial permutation
-    uint64_t ip = 0;
-    for (int i = 0; i < BLOCK_SIZE; i++)
+    for (int i = 0; i < 64; i++)
     {
-        ip |= ((block >> (BLOCK_SIZE - IP[i])) & 1) << (BLOCK_SIZE - i - 1);
+        IP_res |= ((block >> (64 - IP[i])) & 1) << (63 - i);
     }
-
-    // split into left and right
-    uint64_t left = ip >> 32;
-    uint64_t right = ip & 0xFFFFFFFF;
-
-    // generate subkeys
-    uint64_t subkeys[ROUNDS];
-    generate_subkeys(key, &subkeys);
-
-    // rounds
-    for (int i = 0; i < ROUNDS; i++)
-    {
-        uint64_t subkey = encrypt ? subkeys[i] : subkeys[ROUNDS - i - 1];
-
-        // expansion permutation
-        uint64_t expanded = 0;
-        for (int j = 0; j < SUBKEY_SIZE; j++)
-        {
-            expanded |= ((right >> (SUBKEY_SIZE - E[j])) & 1) << (SUBKEY_SIZE - j - 1);
-        }
-
-
-        // xor with subkey
-        expanded ^= subkey;
-
-        // S-boxes
-        uint64_t sbox = 0;
-        for (int j = 0; j < 8; j++)
-        {
-            int row = ((expanded >> (6 * j)) & 1) | ((expanded >> (6 * j + 5) & 1)) << 1;
-            int col = (expanded >> (6 * j + 1)) & 0xF;
-            sbox |= S[j][row][col] << (4 * j);
-        }
-
-        // P permutation
-        uint64_t p = 0;
-        for (int j = 0; j < SUBKEY_SIZE; j++)
-        {
-            p |= ((sbox >> (SUBKEY_SIZE - P[j])) & 1) << (SUBKEY_SIZE - j - 1);
-        }
-
-        // xor with left
-        uint64_t temp = right;
-        right = left ^ p;
-        left = temp;
-
-        if (i < ROUNDS - 1)
-        {
-            uint64_t temp = left;
-            left = right;
-            right = temp;
-        }
-    }
-
-    // combine left and right
-    uint64_t combined = (right << 32) | left;
 
     // final permutation
-    uint64_t fp = 0;
-    for (int i = 0; i < BLOCK_SIZE; i++)
+    for (int i = 0; i < 64; i++)
     {
-        fp |= ((combined >> (BLOCK_SIZE - FP[i])) & 1) << (BLOCK_SIZE - i - 1);
+        FP_res |= ((IP_res >> (64 - FP[i])) & 1) << (63 - i);
     }
 
-    *result = fp;
-    return 0;
-}
-
-void generate_subkeys(uint64_t key, uint64_t* subkeys[ROUNDS])
-{
-    // PC1 permutation
-    uint64_t pc1 = 0;
-    for (int i = 0; i < KEY_SIZE; i++)
-    {
-        pc1 |= ((key >> (KEY_SIZE - PC1[i])) & 1) << (KEY_SIZE - i - 1);
-    }
-
-    // split into left and right
-    uint64_t left = pc1 >> 28;
-    uint64_t right = pc1 & 0xFFFFFFF;
-
-    for (int i = 0; i < ROUNDS; i++)
-    {
-        // shift
-        left = ((left << 1) & 0xFFFFFFF) | ((left >> 27) & 1);
-        right = ((right << 1) & 0xFFFFFFF) | ((right >> 27) & 1);
-
-        // PC2 permutation
-        uint64_t pc2 = 0;
-        uint64_t combined = (left << 28) | right;
-        for (int j = 0; j < SUBKEY_SIZE; j++)
-        {
-            pc2 |= ((combined >> (SUBKEY_SIZE - PC2[j])) & 1) << (SUBKEY_SIZE - j - 1);
-        }
-
-        subkeys[i] = pc2;
-    }
-
-    return;    
+    *result = FP_res;
 }
