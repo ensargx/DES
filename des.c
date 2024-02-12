@@ -10,10 +10,16 @@
 
 #define LOG(...) printf(__VA_ARGS__)
 #define LOG_LINE() printf("Line %d reached.\n", __LINE__)
-#define LOG_BIN(x) \
+#define LOG_BIN_64(x) \
     for (int i = 0; i < 64; i++) \
     { \
         printf("%d", x >> 63 - i & 1); \
+    } \
+    printf("\n");
+#define LOG_BIN_32(x) \
+    for (int i = 0; i < 32; i++) \
+    { \
+        printf("%d", x >> 31 - i & 1); \
     } \
     printf("\n");
 
@@ -28,7 +34,8 @@ int main(int argc, char** argv)
     uint64_t result;
 
     _des(test_data, test_key, &result, 1);
-    printf("Encrypted: 0x%llx\n", result);
+    _des(result, test_key, &result, 0);
+    printf("Result: 0x%llx\n", result);
 
     return 0;
 }
@@ -150,24 +157,97 @@ int P[] = {16, 7, 20, 21, 29, 12, 28, 17,
         2, 8, 24, 14, 32, 27, 3, 9,
         19, 13, 30, 6, 22, 11, 4, 25};
 
-int _des(uint64_t block, uint64_t key, uint64_t* result, int encrypt)
-{
-    uint32_t L = 0;
-    uint32_t R = 0;
+int shifts[16] = {
+    1, 1, 2, 2, 2, 2, 2, 2,
+    1, 2, 2, 2, 2, 2, 2, 1
+};
+
+
+int _des(uint64_t block, uint64_t key, uint64_t* result, int encrypt) {
     uint64_t IP_res = 0;
     uint64_t FP_res = 0;
+    uint64_t L = 0;
+    uint64_t R = 0;
 
-    // initial permutation
-    for (int i = 0; i < 64; i++)
-    {
+    // Perform initial permutation
+    for (int i = 0; i < 64; i++) {
         IP_res |= ((block >> (64 - IP[i])) & 1) << (63 - i);
     }
 
-    // final permutation
-    for (int i = 0; i < 64; i++)
-    {
-        FP_res |= ((IP_res >> (64 - FP[i])) & 1) << (63 - i);
+    // Split into L and R halves
+    L = IP_res >> 32;
+    R = IP_res & 0xFFFFFFFF;
+
+    // Generate subkeys
+    uint64_t subkeys[16];
+    uint64_t permuted_key = 0;
+    for (int i = 0; i < 56; i++) {
+        permuted_key |= ((key >> (64 - PC1[i])) & 1) << (55 - i);
+    }
+
+    // Split into C and D
+    uint32_t C = (uint32_t)(permuted_key >> 28);
+    uint32_t D = (uint32_t)(permuted_key & 0xFFFFFFF);
+
+    // Generate subkeys
+    for (int i = 0; i < 16; i++) {
+        // Apply left shift
+        int shift_amount = shifts[i];
+        C = ((C << shift_amount) | (C >> (28 - shift_amount))) & 0xFFFFFFF;
+        D = ((D << shift_amount) | (D >> (28 - shift_amount))) & 0xFFFFFFF;
+
+        // Combine C and D
+        uint64_t combined = ((uint64_t)C << 28) | D;
+
+        // Apply PC2 permutation to generate subkey
+        subkeys[i] = 0;
+        for (int j = 0; j < 48; j++) {
+            subkeys[i] |= ((combined >> (56 - PC2[j])) & 1) << (47 - j);
+        }
+    }
+
+    // Perform Feistel rounds
+    for (int round = 0; round < 16; round++) {
+        uint64_t temp = R;
+        uint64_t expanded_R = 0;
+        uint64_t f_result = 0;
+
+        // Expansion permutation
+        for (int i = 0; i < 48; i++) {
+            expanded_R |= ((R >> (32 - E[i])) & 1) << (47 - i);
+        }
+
+        // XOR with subkey
+        uint64_t subkey = encrypt ? subkeys[round] : subkeys[15 - round];
+        expanded_R ^= subkey;
+
+        // S-box substitution
+        for (int i = 0; i < 8; i++) {
+            int row = ((expanded_R >> (42 - i * 6)) & 0x01) << 1 | (expanded_R >> (47 - i * 6) & 0x01);
+            int col = ((expanded_R >> (43 - i * 6)) & 0x01) << 3 | ((expanded_R >> (44 - i * 6)) & 0x01) << 2 |
+                      ((expanded_R >> (45 - i * 6)) & 0x01) << 1 | (expanded_R >> (46 - i * 6) & 0x01);
+            uint64_t s_box_value = S[i][row][col];
+            f_result |= s_box_value << (32 - 4 * (i + 1));
+        }
+
+        // P-box permutation
+        uint64_t p_result = 0;
+        for (int i = 0; i < 32; i++) {
+            p_result |= ((f_result >> (32 - P[i])) & 1) << (31 - i);
+        }
+
+        R = L ^ p_result;
+        L = temp;
+    }
+
+    // Combine R and L
+    uint64_t combined = (R << 32) | L;
+
+    // Perform final permutation
+    for (int i = 0; i < 64; i++) {
+        FP_res |= ((combined >> (64 - FP[i])) & 1) << (63 - i);
     }
 
     *result = FP_res;
+    return 0;
 }
