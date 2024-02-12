@@ -26,18 +26,15 @@ Expected Ciphertext: 7A5BBCB84DAA24EE
 def main():
     des = DES()
 
-    key_bin = hex2binlist("133457799BBCDFF1")
+    key_bin = hex2binlist("0F1571C947D9E859")
 
     des.initial_key = key_bin
     des.key = des.generate_subkeys()
     print(binlist2hex(des.key[0]))
 
 
-
-
-
 def hex2binlist(hex_str):
-    key_bin = bin(int(hex_str, 16))[2:]
+    key_bin = bin(int(hex_str.removeprefix('0x'), 16))[2:]
     while len(key_bin) < 64:
         key_bin = '0' + key_bin
     bin_list = []
@@ -52,5 +49,6 @@ def binlist2hex(bin_list):
     bin_str = ''.join(str(i) for i in bin_list)
     hex_str = hex(int(bin_str, 2))[2:]
     return "0x" + hex_str.upper()
+
 if __name__ == "__main__":
     main()
